@@ -5,13 +5,41 @@ import { privateKeyToAccount } from 'viem/accounts';
 import TelegramBot from 'node-telegram-bot-api';
 import { setApiKey, tradeCoin } from '@zoralabs/coins-sdk';
 // ---------- ENV ----------
-const ZORA_API_KEY = process.env.ZORA_API_KEY;
-const PRIV = process.env.PRIVATE_KEY;
-const HTTP_RPC = process.env.BASE_HTTP_RPC;
-const TARGET = process.env.TARGET_WALLET; // ENS veya adres
+function requireEnv(name) {
+    const v = process.env[name];
+    if (!v || !String(v).trim()) {
+        // Fail fast with a clear message instead of crashing later
+        console.error(`Missing required env: ${name}`);
+        process.exit(1);
+    }
+    return String(v).trim();
+}
+function normalizePrivateKey(raw) {
+    let k = raw.trim();
+    // Accept with or without 0x prefix
+    if (!k.startsWith('0x') && !k.startsWith('0X'))
+        k = `0x${k}`;
+    // Basic sanity checks: 0x + 64 hex chars
+    if (!(k.length === 66 && /^0x[0-9a-fA-F]{64}$/.test(k))) {
+        console.error('PRIVATE_KEY must be 0x-prefixed 64-hex string.');
+        process.exit(1);
+    }
+    return k;
+}
+const ZORA_API_KEY = requireEnv('ZORA_API_KEY');
+const PRIV = normalizePrivateKey(requireEnv('PRIVATE_KEY'));
+const HTTP_RPC = requireEnv('BASE_HTTP_RPC');
+const TARGET = requireEnv('TARGET_WALLET'); // ENS veya adres
 const AUTOBUY_ETH = parseFloat(process.env.AUTOBUY_ETH || '0.001');
-const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TG_DEST = (process.env.TELEGRAM_CHANNEL || process.env.TELEGRAM_CHAT_ID);
+const TG_TOKEN = requireEnv('TELEGRAM_BOT_TOKEN');
+const TG_DEST = (() => {
+    const v = process.env.TELEGRAM_CHANNEL || process.env.TELEGRAM_CHAT_ID;
+    if (!v || !String(v).trim()) {
+        console.error('Missing required env: TELEGRAM_CHANNEL or TELEGRAM_CHAT_ID');
+        process.exit(1);
+    }
+    return String(v).trim();
+})();
 // ---------- Clients ----------
 setApiKey(ZORA_API_KEY);
 const account = privateKeyToAccount(PRIV);
@@ -80,7 +108,7 @@ async function checkAndBuy() {
                         sell: { type: 'eth' },
                         buy: { type: 'erc20', address: coin },
                         amountIn,
-                        slippage: 0.1,
+                        slippage: 0.6,
                         sender: account.address,
                     },
                     walletClient,
