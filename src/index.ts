@@ -181,7 +181,7 @@ async function checkAndBuyFor(cfg: BotConfig): Promise<boolean> {
         sell: { type: 'eth' },
         buy: { type: 'erc20', address: coin },
         amountIn,
-        slippage: 0.6,
+        slippage: 0.9,
         sender: account.address,
       },
       walletClient,
