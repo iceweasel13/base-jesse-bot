@@ -28,7 +28,9 @@ function requireEnv(name: string): string {
   }
   return String(v).trim();
 }
-let tickCount = 0;
+let tickCount = 0;           // 15 dakikalık sayaç
+let wallet1Done = false;     // Wallet1 ilk başarılı alımdan sonra tekrar denemez
+let wallet2Done = false;   
 function normalizePrivateKey(raw: string): `0x${string}` {
   let k = raw.trim();
   if (!k.startsWith('0x') && !k.startsWith('0X')) k = `0x${k}`;
@@ -213,17 +215,31 @@ async function buyUntilSuccess(cfg: BotConfig, maxRetries = 10): Promise<boolean
 
 // ---------- Main ----------
 async function main() {
- await notify('Bot başladı');
+  await notify('Bot başladı');
+
   setInterval(async () => {
-    const ok1 = await buyUntilSuccess(bots[0]); // önce Wallet1 başarılı olana kadar
-    const ok2 = await buyUntilSuccess(bots[1]); // sonra Wallet2
-tickCount++;
-    if (tickCount % 30 === 0) { // 30 x 30sn = 15dk
-      await notify(`⏳ Durum: Wallet1 coin=${bots[0].lastBoughtCoin ?? 'yok'}, Wallet2 coin=${bots[1].lastBoughtCoin ?? 'yok'}`);
+    // Önce Wallet1, henüz başarılı olmadıysa dene
+    if (!wallet1Done) {
+      const ok1 = await buyUntilSuccess(bots[0]);
+      if (ok1) wallet1Done = true;
     }
 
-    // her iki cüzdan da başarılı olduysa botu durdur
-    if (ok1 && ok2) {
+    // Sonra Wallet2, henüz başarılı olmadıysa dene
+    if (!wallet2Done) {
+      const ok2 = await buyUntilSuccess(bots[1]);
+      if (ok2) wallet2Done = true;
+    }
+
+    tickCount++;
+    // 30 x 30 sn = 15 dk
+    if (tickCount % 30 === 0) {
+      await notify(
+        `⏳ Durum: Wallet1 coin=${bots[0].lastBoughtCoin ?? 'yok'}, Wallet2 coin=${bots[1].lastBoughtCoin ?? 'yok'}`
+      );
+    }
+
+    // Her iki cüzdan da başarılı olduysa botu durdur
+    if (wallet1Done && wallet2Done) {
       await notify('🎉 Her iki cüzdan da başarılı alım yaptı. Bot kapanıyor.');
       process.exit(0);
     }
